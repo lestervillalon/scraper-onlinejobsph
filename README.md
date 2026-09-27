@@ -69,6 +69,7 @@ python scraper.py --delay 2
 | `--no-xlsx` | Skip the `.xlsx` workbook (JSONL + CSV still written) |
 | `--append` | Add only jobs not already in `jobs.xlsx`, instead of a new file |
 | `--stem NAME` | Pin the filename (defaults to `jobs` when `--append`) |
+| `--snapshot NAME` | Also write this run's **live listings** to `output/<NAME>.xlsx` (a current-only snapshot, separate from the accumulated workbook) |
 | `--webhook URL` | POST newly found jobs to this n8n webhook — see [N8N.md](N8N.md) |
 | `--webhook-token T` | Sent as the `X-Webhook-Token` header (n8n Header Auth) |
 | `--out DIR` | Output directory (default `output/`) |
@@ -101,6 +102,12 @@ safeguards worth knowing about:
 - **`jobs-backup.xlsx`** holds the sheet exactly as it was before the most recent
   append. One file, overwritten each run — it can't accumulate. If a rewrite ever
   goes wrong, this is the undo.
+
+With **`--snapshot NAME`** the run *additionally* writes `output/<NAME>.xlsx`
+holding only the listings seen this run (the live search results), independent
+of the accumulated `jobs.xlsx`. The cloud workflow uses this to publish a
+**current-only** sheet — `output/current.xlsx` — so the Sheet shows just the
+jobs that are live right now, replaced on every run.
 
 | Field | Source |
 | --- | --- |
@@ -157,18 +164,20 @@ total is reached or a page repeats.
 Two ways to run this unattended. **[CLOUD.md](CLOUD.md)** is the one to read if
 you want it to keep working while your laptop is asleep.
 
-**GitHub Actions + Google Sheets** — free, runs in GitHub's cloud twice a day,
-appends new listings to a Sheet you can open anywhere, and pings Telegram when
-something appears. Nothing runs on your machine.
+**GitHub Actions + Google Sheets** — free, runs in GitHub's cloud every 2 hours
+and publishes the **current live listings** to a Google Sheet you can open
+anywhere. The Sheet is replaced each run (newest first), so it always shows what
+is live now. Nothing runs on your machine.
 
 ```
-GitHub Actions ──▶ scraper.py ──▶ jobs.xlsx (committed = dedup memory)
-                       └────────▶ sheet_sync.py ──▶ Google Sheets + Telegram
+GitHub Actions ──▶ scraper.py --append --snapshot current ──▶ jobs.xlsx (dedup memory)
+                       └──────────────────────────────────▶ to_gsheet.py --file output/current.xlsx ──▶ Google Sheets
 ```
 
 The repo holds the whole thing: [`.github/workflows/scrape.yml`](.github/workflows/scrape.yml),
-[`sheet_sync.py`](sheet_sync.py) and [`apps-script/Code.gs`](apps-script/Code.gs).
-`setup-github.ps1` gets it onto GitHub.
+[`to_gsheet.py`](to_gsheet.py) and [`scraper.py`](scraper.py). The older webhook
+fallback ([`sheet_sync.py`](sheet_sync.py) + [`apps-script/Code.gs`](apps-script/Code.gs))
+is still in the repo but unused. `setup-github.ps1` gets it onto GitHub.
 
 **n8n** — [N8N.md](N8N.md). The trigger runs locally and pushes results out to
 n8n. Still works, but the scraping stops when the machine does.
