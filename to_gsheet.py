@@ -240,49 +240,34 @@ def main():
 
     existing = ws.get_all_values()
     if not existing:
-        ws.append_row(HEADERS)
         existing = [HEADERS]
 
     header_row = existing[0]
     url_col = header_row.index("URL") if "URL" in header_row else 5
-    existing_urls = {row[url_col] for row in existing[1:] if len(row) > url_col and row[url_col]}
 
-    if args.replace:
-        # Preserve extra columns like "Sent" by URL
-        extra_headers = header_row[len(HEADERS):] if len(header_row) > len(HEADERS) else []
-        extra_by_url = {}
-        for row in existing[1:]:
-            if len(row) > url_col and row[url_col]:
-                extra_by_url[row[url_col]] = row[len(HEADERS):]
+    # Preserve extra columns like "Sent" by URL
+    extra_headers = header_row[len(HEADERS):] if len(header_row) > len(HEADERS) else []
+    extra_by_url = {}
+    for row in existing[1:]:
+        if len(row) > url_col and row[url_col]:
+            extra_by_url[row[url_col]] = row[len(HEADERS):]
 
-        out = [HEADERS + extra_headers]
-        for j in jobs:
-            base_vals = [str(j.get(f, "")) for f in FIELDS]
-            extra = extra_by_url.get(j.get("url", ""), [])
-            extra = (extra + [""] * len(extra_headers))[:len(extra_headers)]
-            out.append(base_vals + extra)
+    # Newest first. Posted is ISO "YYYY-MM-DD HH:MM:SS", so a string sort is correct.
+    ordered = sorted(jobs, key=lambda j: str(j.get("date") or ""), reverse=True)
 
-        ws.clear()
-        ws.update(out, value_input_option="USER_ENTERED")
-        print(f"Replaced '{args.worksheet}' with {len(jobs)} rows (preserved {len(extra_headers)} extra column(s)).")
-        print(f"Open: https://docs.google.com/spreadsheets/d/{sheet_id}/edit")
-        return 0
+    out = [HEADERS + extra_headers]
+    for j in ordered:
+        base_vals = [str(j.get(f, "")) for f in FIELDS]
+        extra = extra_by_url.get(j.get("url", ""), [])
+        extra = (extra + [""] * len(extra_headers))[:len(extra_headers)]
+        out.append(base_vals + extra)
 
-    # Append mode (default)
-    to_add = []
-    for j in jobs:
-        url = j.get("url", "")
-        if not args.no_dedupe and url in existing_urls:
-            continue
-        to_add.append([str(j.get(f, "")) for f in FIELDS])
-
-    if not to_add:
-        print(f"Nothing to add. All {len(jobs)} jobs are already in Google Sheet.")
-        print(f"Open: https://docs.google.com/spreadsheets/d/{sheet_id}/edit")
-        return 0
-
-    ws.append_rows(to_add, value_input_option="USER_ENTERED")
-    print(f"Added {len(to_add)} new job(s) to '{args.worksheet}' (skipped {len(jobs) - len(to_add)} existing).")
+    ws.clear()
+    ws.update(out, value_input_option="USER_ENTERED")
+    print(
+        f"Wrote {len(ordered)} row(s) to '{args.worksheet}' "
+        f"(newest first, preserved {len(extra_headers)} extra column(s))."
+    )
     print(f"Open: https://docs.google.com/spreadsheets/d/{sheet_id}/edit")
     return 0
 
