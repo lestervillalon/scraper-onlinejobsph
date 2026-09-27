@@ -41,9 +41,9 @@ jobs:
       - name: Scrape
         run: |
           set -euo pipefail
-          python scraper.py --append
-          echo "--- workbook now holds ---"
-          python -c "import openpyxl;ws=openpyxl.load_workbook('output/jobs.xlsx').active;print(ws.max_row-1,'rows')"
+          python scraper.py --append --snapshot current
+          echo "--- live snapshot now holds ---"
+          python -c "import openpyxl;ws=openpyxl.load_workbook('output/current.xlsx').active;print(ws.max_row-1,'rows')"
 
       # Committing happens BEFORE the Google Sheets sync on purpose. The
       # workbook is the thing that must not be lost; if Sheets is down, the
@@ -94,7 +94,7 @@ jobs:
           set -euo pipefail
           if [ -f "gsheet_config.json" ] && [ -f "oauth_token.json" ]; then
             echo "Syncing to Google Sheets via Google Sheets API (gspread)..."
-            python to_gsheet.py
+            python to_gsheet.py --file output/current.xlsx
           elif [ -n "${SHEETS_WEBHOOK_URL:-}" ]; then
             echo "Syncing to Google Sheets via Webhook..."
             python sheet_sync.py --rows 60

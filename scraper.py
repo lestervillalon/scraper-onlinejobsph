@@ -803,6 +803,8 @@ def main() -> int:
                    help="add only jobs not already in jobs.xlsx, instead of a new file")
     p.add_argument("--stem",
                    help="pin the output filename (defaults to jobs when --append)")
+    p.add_argument("--snapshot", metavar="STEM",
+                   help="also write this run's live listings to output/<STEM>.xlsx")
     p.add_argument("--webhook", metavar="URL",
                    help="POST the new jobs to this n8n webhook after writing")
     p.add_argument("--webhook-token", metavar="TOKEN",
@@ -842,6 +844,10 @@ def main() -> int:
     paths, fresh = write_outputs(
         jobs, args.out, want_xlsx=not args.no_xlsx, stem=stem, append=args.append
     )
+
+    if args.snapshot:
+        snap_path, _ = write_xlsx(jobs, args.out, args.snapshot, append=False)
+        print(f"  (snapshot) {snap_path}")
 
     if args.append:
         print(f"\n{len(jobs)} scraped — {len(fresh)} new, "
